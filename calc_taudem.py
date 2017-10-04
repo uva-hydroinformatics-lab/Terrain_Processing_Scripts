@@ -10,8 +10,7 @@ as well as with the D-infinity flow direction method (developed by D. Tarbarton)
 Batch files are called to execute these calculations, calculating on 8 processors
 (can be changed in batch files).
 
-Before processing, the projectiong of the user designated elevation file is checked 
-and projected to WGS 84 if necessary.  
+Before processing,the user designated elevation file is projected to UTM (currently VA 17N). 
 
 Download TauDEM: http://hydrology.usu.edu/taudem/taudem5/
 Download gdal: https://github.com/creare-com/pydem/blob/master/INSTALL.md
@@ -33,24 +32,15 @@ import sys
 
 f_in = sys.argv[1] #input elevation file
 
-def Check_prj(filename):
+def project_to_utm(filename):
     gdal_dset = gdal.Open(filename)
     prj = gdal_dset.GetProjection()
-    srs = osr.SpatialReference(wkt = prj)
-    dset_prj = srs.GetAttrValue("authority",1) 
-
-    if dset_prj != "4326":
-        print "Projection is: {} \n".format(prj)
-        print "Projecting to WGS 84.........................................\n"
-        prj_file = filename[:-4] + "_prj.tif" #name of projected elevation file
-        cmd = "gdalwarp.exe %s %s -t_srs EPSG:4326" %(filename, prj_file) 
-        subprocess.call(cmd, shell=True)
-        return prj_file
-    else:
-        print "Projection is {} \n".format(prj)
-        prj_file = filename
-        return prj_file
-
+    prj_file = filename[:-4] + '_UTM.tif'
+    print "Projection is: {} \n".format(prj)   
+    print ("Projecting %s from WSG84 to NAD83 UTM ZONE 17N..................\n" %(filename))
+    cmd = 'gdalwarp.exe %s %s -t_srs "+proj=utm +zone=17 +datum=NAD83" -tr 0.76200152 0.76200152' %(filename, prj_file)
+    subprocess.call(cmd)
+    return prj_file
 
 def remove_pits(prj_file):
     fel_file = prj_file[:-4]+"fel.tif" #this is the default file name given to the TauDEM remvove pits output
@@ -128,7 +118,7 @@ def Dinf_calcs(fel_file):
 
 def main():
     #check projection of elevation file
-    filename_to_elevation_geotiff = Check_prj(f_in)
+    filename_to_elevation_geotiff = project_to_utm(f_in)
 
     #remove pits from projcted elevation file
     fel_file = remove_pits(filename_to_elevation_geotiff)
