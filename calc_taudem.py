@@ -20,6 +20,7 @@ Note 2: Batch files calling Dinf-specific commands must include file path to the
         Dinf executable, this was not necessary for D8-specific or general TauDEM
         executables.
 
+Command-line args: input elevation file, Datum, UTM zone #, UTM zone N/S
 
 Author: Gina O'Neil
 """
@@ -32,15 +33,35 @@ import sys
 
 f_in = sys.argv[1] #input elevation file
 
-def project_to_utm(filename):
+def Check_prj(filename):
     gdal_dset = gdal.Open(filename)
     prj = gdal_dset.GetProjection()
-    prj_file = filename[:-4] + '_UTM.tif'
-    print "Projection is: {} \n".format(prj)   
-    print ("Projecting %s from WSG84 to NAD83 UTM ZONE 17N..................\n" %(filename))
-    cmd = 'gdalwarp.exe %s %s -t_srs "+proj=utm +zone=17 +datum=NAD83" -tr 0.76200152 0.76200152' %(filename, prj_file)
-    subprocess.call(cmd)
-    return prj_file
+    srs = osr.SpatialReference(wkt = prj)
+    if srs.IsProjected:
+        pcs = srs.GetAttrValue('projcs')
+        print pcs
+        if pcs == "%s / UTM zone %s%s" %(sys.argv[2], sys.argv[3], sys.argv[4]):
+            print "Projection is: {} \n".format(prj)
+            prj_file = filename
+            return prj_file
+        else:
+            prj_file = filename[:-4] + '_prj.tif'
+            print "Projected coordinate system does not match user input\n"
+            print ("Projecting %s to %s UTM ZONE %s%s..................\n" \
+                   %(filename, sys.argv[2], sys.argv[3], sys.argv[4]))
+            cmd = 'gdalwarp.exe %s %s -t_srs "+proj=utm +zone=%s +datum=%s" -tr 0.76200152 0.76200152' \
+                %(filename, prj_file, sys.argv[3], sys.argv[2])
+            subprocess.call(cmd, shell=True)
+            return prj_file
+    else:
+        prj_file = filename[:-4] + '_prj.tif'
+        print "Projection is: {} \n".format(prj)   
+        print ("Projecting %s to %s UTM ZONE %s%s..................\n" \
+               %(filename, sys.argv[2], sys.argv[3], sys.argv[4]))
+        cmd = 'gdalwarp.exe %s %s -t_srs "+proj=utm +zone=%s +datum=%s" -tr 0.76200152 0.76200152' \
+            %(filename, prj_file, sys.argv[3], sys.argv[2])
+        subprocess.call(cmd, shell=True)
+        return prj_file
 
 def remove_pits(prj_file):
     fel_file = prj_file[:-4]+"fel.tif" #this is the default file name given to the TauDEM remvove pits output
@@ -116,9 +137,24 @@ def Dinf_calcs(fel_file):
         
     print "Dinf calculations complete! \n"
 
+def clip_rasters(raster, boundary):
+    # Name of clip raster file(s)
+#    output = raster[:-4]+'_clip.tif'
+#    print output
+    
+    cmd = "gdalwarp.exe -cutline %s -crop_to_cutline -dstnodata -9999.0 \
+    %s %s_clip.tif" %(boundary, raster, raster[:-4]) 
+    
+    subprocess.call(cmd)
+    print "%s has been clipped!" %(raster)
+        
 def main():
+     
+    #input elevation file
+    f_in = sys.argv[1]
+    
     #check projection of elevation file
-    filename_to_elevation_geotiff = project_to_utm(f_in)
+    filename_to_elevation_geotiff = Check_prj(f_in)
 
     #remove pits from projcted elevation file
     fel_file = remove_pits(filename_to_elevation_geotiff)
@@ -128,6 +164,17 @@ def main():
     
     #execute Dinf calcs
     Dinf_calcs(fel_file)
+
+    #clip outputs to boundary    
+    shp = r"G:\P06_RT29\Data\WBD\WBD_prj.shp"
+    
+    for tiff in os.listdir('.\D8'):
+        clip_rasters('.\D8\\'+tiff, shp)
+    
+    for tiff in os.listdir('.\Dinf'):
+        clip_rasters('.\Dinf\\'+tiff, shp)
+
+    print "Done!"
 
 
 if __name__ == '__main__':
