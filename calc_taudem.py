@@ -30,7 +30,6 @@ import os
 import subprocess
 import sys
 
-
 f_in = sys.argv[1] #input elevation file
 
 def Check_prj(filename):
@@ -51,7 +50,9 @@ def Check_prj(filename):
                    %(filename, sys.argv[2], sys.argv[3], sys.argv[4]))
             cmd = 'gdalwarp.exe %s %s -t_srs "+proj=utm +zone=%s +datum=%s" -tr 0.76200152 0.76200152' \
                 %(filename, prj_file, sys.argv[3], sys.argv[2])
-            subprocess.call(cmd, shell=True)
+            cmd_info = 'gdalinfo.exe -stats %s'%(prj_file)
+            subprocess.call(cmd, shell = True)
+            subprocess.call(cmd_info, shell = True)
             return prj_file
     else:
         prj_file = filename[:-4] + '_prj.tif'
@@ -60,7 +61,9 @@ def Check_prj(filename):
                %(filename, sys.argv[2], sys.argv[3], sys.argv[4]))
         cmd = 'gdalwarp.exe %s %s -t_srs "+proj=utm +zone=%s +datum=%s" -tr 0.76200152 0.76200152' \
             %(filename, prj_file, sys.argv[3], sys.argv[2])
-        subprocess.call(cmd, shell=True)
+        cmd_info = 'gdalinfo.exe -stats %s'%(prj_file)
+        subprocess.call(cmd, shell = True)
+        subprocess.call(cmd_info, shell = True)
         return prj_file
 
 def remove_pits(prj_file):
@@ -137,16 +140,19 @@ def Dinf_calcs(fel_file):
         
     print "Dinf calculations complete! \n"
 
-def clip_rasters(raster, boundary):
+def clip_rasters(raster, boundary): #must pass filename w/ path of raster, not an opened gdal dset
     # Name of clip raster file(s)
-#    output = raster[:-4]+'_clip.tif'
-#    print output
+    clipped = raster[:-4]+'_clip.tif'
     
     cmd = "gdalwarp.exe -cutline %s -crop_to_cutline -dstnodata -9999.0 \
-    %s %s_clip.tif" %(boundary, raster, raster[:-4]) 
+    %s %s" %(boundary, raster, clipped) 
     
+    cmd_info = 'gdalinfo.exe -stats %s'%(clipped)
     subprocess.call(cmd)
-    print "%s has been clipped!" %(raster)
+    subprocess.call(cmd_info)
+    
+print "%s has been clipped!" %(raster)
+
         
 def main():
      
